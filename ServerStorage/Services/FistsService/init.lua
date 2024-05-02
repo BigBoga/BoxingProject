@@ -4,7 +4,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 
-local AttackList = require(script.AttackList) -- Getting AttackList
+local AttackList = require(script.Parent.AttackList) -- Getting AttackList
 local Settings = require(ServerStorage.Main.Settings) -- Getting Settings
 
 local ParticlesFolder = ServerStorage.Particles
