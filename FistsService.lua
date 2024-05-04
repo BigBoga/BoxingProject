@@ -29,6 +29,7 @@ local FistsService = Knit.CreateService{ -- Creating Service
 }
 
 function FistsService:PlaySound(Character, Id)
+	--We create a sound within the character so that the sound doesn't play throughout the entire map
 	local Sound = Instance.new("Sound", Character.HumanoidRootPart)
 	Sound.SoundId = `rbxassetid://{Id}`
 	Sound.Volume = 0.3 -- changing volume
@@ -53,33 +54,34 @@ end
 -- When Player Triger remote attack
 
 function FistsService.Client:Attack(Player, AttackType)
-	if not PlayersState[Player] then return end
-	if not Player.Character then return end
-	if Player.Character.Humanoid.Health <= 0 then return end
-	if not AttackList[AttackType] then return end
 	if not Cooldowns[AttackType]:CheckPlayer(Player.UserId) then return end
-	if PlayersState[Player].InBlock == true then return end
-	if PlayersState[Player].CanDamage == false then return end
+	if not PlayersState[Player] then return end  -- We check if the player is in the state table.
+	if not Player.Character then return end -- We check if the character is absent from our player
+	if Player.Character.Humanoid.Health <= 0 then return end --We check if the character is alive
+	if not AttackList[AttackType] then return end -- We check if such a attack is in the list
+	if PlayersState[Player].InBlock == true then return end -- We check if the character is in a blocked state
+	if PlayersState[Player].CanDamage == false then return end -- We check if it's possible to damage our player. If not, we return
 	
+	--We create a variable for the player's selected attack.
 	local AttackType = AttackList[AttackType]
 	
-	-- Anim Playing
+	-- Anim Playing // We search for a random animation in the selected type of attack
 	local RandomAnim = AttackType.Anims[math.random(1,#AttackType.Anims)]
 	FistsService:PlayAnim(Player, RandomAnim)
 	
-	-- Sound Playing
+	-- Sound Playing // We vary the playback speed to make it seem like different sounds
 	local Sound = FistsService:PlaySound(Player.Character, 5835032207) -- playing sound id
 	Sound.PlaybackSpeed = 1 + math.random(1, 10) * 0.1 -- changing sound speed
 	
-	-- Finding player to hit
+	-- Let's use our function and find some player
 	local HitPlayer = FistsService:MakeColliderAndFind(Player.Character)
 	if not HitPlayer then return end
 	
 
-	-- Playing Hit Sound
+	-- Playing Hit Sound // We search for a random hit sound in the selected type of attack
 	FistsService:PlaySound(HitPlayer, AttackType.HitSound[math.random(#AttackType.HitSound)])
 
-	-- Main Function
+	-- If the player we are hitting is in a blocking state, we reduce the damage power. If the player delivers a strong strike, we decrease the damage slightly less
 	local Multiple = 1
 	if PlayersState[Players:GetPlayerFromCharacter(HitPlayer)] then
 		if PlayersState[Players:GetPlayerFromCharacter(HitPlayer)].InBlock == true then
@@ -91,17 +93,23 @@ function FistsService.Client:Attack(Player, AttackType)
 		end
 	end
 
+
+	--We create a function in the task spawn so that the script immediately reaches the function with the kill check
 	task.spawn(function()
 		HitPlayer.Humanoid:TakeDamage(math.random(AttackType.Damage.Min, AttackType.Damage.Max) * Multiple)
 		HitPlayer.HumanoidRootPart:ApplyImpulse(Player.Character.HumanoidRootPart.CFrame.LookVector * (150 * AttackType.Impulse * Multiple))
 		FistsService:CreateBlood(HitPlayer, Player.Character.HumanoidRootPart.CFrame.LookVector)
 	end)
 	
-	-- Checking player killed another player
+	-- Checking player killed another player 
 	FistsService:CheckKill(Player, HitPlayer)
 end
 
 function FistsService.Client:Block(Player)
+    --[[
+    We check our player for cooldown and whether they are in the table of player states. 
+    If yes, we set the value in this table indicating that the player is in a blocked state, or vice versa.
+    --]]
 	if not blockCooldown:CheckPlayer(Player.UserId) then return end -- checking ready player or not
 	
 	local PlayerInTable = PlayersState[Player] -- finding player into the table with state
@@ -116,6 +124,11 @@ function FistsService.Client:Block(Player)
 		Player.Character.InBlock.Value = false
 		PlayerInTable.InBlock = false
 	end
+	
+	--[[
+	We create a coroutine so that we can later suspend the function to avoid a bug where the block
+	is removed and placed again, preventing it from being removed again
+	--]]
 	
 	if PlayerInTable.InBlock then
 		PlayerInTable.BlockAnim = FistsService:PlayAnim(Player,Settings.BlockAnim)
@@ -132,16 +145,23 @@ end
 
 -- Creating collider to find player to hit
 
+-- We create variables to simplify the work. These variables store the position slightly offset from the player, as well as the collider size, which is defined in the settings.
 function FistsService:MakeColliderAndFind(Character)
 	local ColliderCFrame = Character.HumanoidRootPart.CFrame * CFrame.new(Vector3.new(0,0,-2))
 	local ColliderSize = Settings.ColliderSize
+	
+	--[[
+	We create parameters for our collider and set an option to make our player not visible to the collider. 
+	If the collider detects any player, we stop the loop and return the character of that player.
+	Also, if debug mode is enabled, we create a debug object with parameters from our variables.
+	--]]
 	
 	local Overlap = OverlapParams.new() -- Creating Overlap
 	Overlap.FilterType = Enum.RaycastFilterType.Exclude -- Settings type on exclude
 	Overlap.FilterDescendantsInstances = {Character} -- set exluding our player
 	
 	local Bounds = workspace:GetPartBoundsInBox(ColliderCFrame, ColliderSize, Overlap)
-	
+
 	if Settings.Debug then
 		local DebugPart = Instance.new("Part", workspace) -- Creating part for debug
 		DebugPart.CanCollide = false
@@ -159,6 +179,7 @@ function FistsService:MakeColliderAndFind(Character)
 end
 
 
+-- If the person we hit runs out of health, we increment the kill count in the statistics by one
 function FistsService:CheckKill(Player, Hited)
 	if Hited.Humanoid.Health > 0 then return end -- if out player killed him then
 	
@@ -166,6 +187,7 @@ function FistsService:CheckKill(Player, Hited)
 	
 	FistsService:CreateBloodPart(Hited, Vector3.new(8,0.05,8))
 	
+	-- If we find a player from the character, we increment their death count by one.
 	local KilledPlayer = Players:GetPlayerFromCharacter(Hited)
 	if not KilledPlayer then return end
 	
@@ -175,10 +197,12 @@ end
 -- Create blood effect on baseplate
 
 function FistsService:CreateBloodPart(Character, Size_Set)
+	-- Here we set up parameters for the raycast and configure it so that the raycast doesn't detect our player.
 	local Params = RaycastParams.new() -- Creating Params
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character}
 
+	-- We launch a raycast. If the raycast detects any object, and that object fits our parameters, we create blood at the position of the raycast hit.
 	local rayInfo = workspace:Raycast(Character.HumanoidRootPart.Position, Vector3.new(0,-5,0),Params) -- Making raycast with out params
 	if rayInfo then -- if raycast finding anything then creating blood part
 		if rayInfo.Instance then
@@ -199,12 +223,14 @@ end
 -- Create blood particles on hit player
 
 function FistsService:CreateBlood(Character, LookVector)
-	if Character.Humanoid.Health <= 0 then return end
-	
+	--[[
+	We clone the blood particle and attach it to the character we are hitting. 
+	Then we add a weld and the particle to the debris to be removed after the specified time.
+	--]]
 	local Blood = ParticlesFolder.Blood:Clone()
 	Blood.Parent = workspace
 	Blood.Position = Character.HumanoidRootPart.Position - LookVector*1 -- we set the position so that it is closer to the side of the player who hit
-	
+	--We create a weld to attach our character to the particle
 	local Weld = Instance.new("WeldConstraint", workspace) -- Creating weld for weld particle to character
 	Weld.Part0 = Character.HumanoidRootPart
 	Weld.Part1 = Blood
