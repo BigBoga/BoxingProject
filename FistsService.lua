@@ -171,6 +171,9 @@ function FistsService.Client:FireBall(Player)
 	end)
 	
 	PlayersState[Player].InState = false
+
+        -- Checking player killed another player 
+	FistsService:CheckKill(Player, hum.Parent)
 end
 
 function FistsService.Client:Block(Player)
