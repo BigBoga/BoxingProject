@@ -107,8 +107,8 @@ end
 
 function FistsService.Client:Block(Player)
     --[[
-    We check our player for cooldown and whether they are in the table of player states. 
-    If yes, we set the value in this table indicating that the player is in a blocked state, or vice versa.
+    --We check our player for cooldown and whether they are in the table of player states. 
+    --If yes, we set the value in this table indicating that the player is in a blocked state, or vice versa.
     --]]
 	if not blockCooldown:CheckPlayer(Player.UserId) then return end -- checking ready player or not
 	
@@ -151,9 +151,9 @@ function FistsService:MakeColliderAndFind(Character)
 	local ColliderSize = Settings.ColliderSize
 	
 	--[[
-	We create parameters for our collider and set an option to make our player not visible to the collider. 
-	If the collider detects any player, we stop the loop and return the character of that player.
-	Also, if debug mode is enabled, we create a debug object with parameters from our variables.
+	--We create parameters for our collider and set an option to make our player not visible to the collider. 
+	--If the collider detects any player, we stop the loop and return the character of that player.
+	--Also, if debug mode is enabled, we create a debug object with parameters from our variables.
 	--]]
 	
 	local Overlap = OverlapParams.new() -- Creating Overlap
@@ -224,8 +224,8 @@ end
 
 function FistsService:CreateBlood(Character, LookVector)
 	--[[
-	We clone the blood particle and attach it to the character we are hitting. 
-	Then we add a weld and the particle to the debris to be removed after the specified time.
+	--We clone the blood particle and attach it to the character we are hitting. 
+	--Then we add a weld and the particle to the debris to be removed after the specified time.
 	--]]
 	local Blood = ParticlesFolder.Blood:Clone()
 	Blood.Parent = workspace
