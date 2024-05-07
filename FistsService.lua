@@ -1,6 +1,7 @@
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 
@@ -8,6 +9,7 @@ local AttackList = require(script.AttackList) -- Getting AttackList
 local Settings = require(ServerStorage.Main.Settings) -- Getting Settings
 
 local ParticlesFolder = ServerStorage.Particles
+local Fireball = ServerStorage.Main.Fireball
 
 local PlayersState = {}
 
@@ -18,13 +20,16 @@ local Cooldowns = {
 } 
 
 local blockCooldown = Cooldown.NewCooldown(1)
+local fireBallCooldown = Cooldown.NewCooldown(1)
 
 local FistsService = Knit.CreateService{ -- Creating Service
 	Name = "FistsService",
 	Client = {
 		Attack = Knit.CreateSignal(),
 		Block = Knit.CreateSignal(),
-		Hitted = Knit.CreateSignal()
+		Hitted = Knit.CreateSignal(),
+		FireBall = Knit.CreateSignal(),
+		Shake = Knit.CreateSignal()
 	}
 }
 
@@ -41,7 +46,7 @@ function FistsService:PlaySound(Character, Id)
 	return Sound
 end
 
-function FistsService:PlayAnim(Player, id, repeating)
+function FistsService:PlayAnim(Player, id)
 	local NewAnim = Instance.new("Animation")
 	NewAnim.AnimationId = `rbxassetid://{id}`
 
@@ -61,6 +66,7 @@ function FistsService.Client:Attack(Player, AttackType)
 	if not AttackList[AttackType] then return end -- We check if such a attack is in the list
 	if PlayersState[Player].InBlock == true then return end -- We check if the character is in a blocked state
 	if PlayersState[Player].CanDamage == false then return end -- We check if it's possible to damage our player. If not, we return
+	if PlayersState[Player].InState == true then return end
 	
 	--We create a variable for the player's selected attack.
 	local AttackType = AttackList[AttackType]
@@ -93,7 +99,6 @@ function FistsService.Client:Attack(Player, AttackType)
 		end
 	end
 
-
 	--We create a function in the task spawn so that the script immediately reaches the function with the kill check
 	task.spawn(function()
 		HitPlayer.Humanoid:TakeDamage(math.random(AttackType.Damage.Min, AttackType.Damage.Max) * Multiple)
@@ -105,10 +110,73 @@ function FistsService.Client:Attack(Player, AttackType)
 	FistsService:CheckKill(Player, HitPlayer)
 end
 
+function FistsService.Client:FireBall(Player)
+	if not fireBallCooldown:CheckPlayer(Player.UserId) then return end
+	if not PlayersState[Player] then return end  -- We check if the player is in the state table.
+	if not Player.Character then return end -- We check if the character is absent from our player
+	if Player.Character.Humanoid.Health <= 0 then return end --We check if the character is alive
+	if PlayersState[Player].InState == true then return end
+	if PlayersState[Player].InBlock == true then return end
+	
+	PlayersState[Player].InState = true
+	
+	local dir = Player.Character.HumanoidRootPart.CFrame.LookVector * 300
+	
+	--We set up parameters for our raycast, switch to exception mode, and add our player to the list. To prevent the raycast from interacting with our player.
+	local RayParam = RaycastParams.new()
+	RayParam.FilterType = Enum.RaycastFilterType.Exclude
+	RayParam.FilterDescendantsInstances = {Player.Character}
+	
+	local RayInfo = workspace:Raycast(Player.Character.HumanoidRootPart.Position, dir, RayParam)
+
+	--If the raycast finds any object, and if there is a humanoid in the parent of this object, then we proceed with the function
+	if not RayInfo then PlayersState[Player].InState = false return end
+	--We have two possible scenarios: if the raycast collides with an accessory, then its parent will be the accessory. Therefore, we need to search in the parent parent
+	local hum = RayInfo.Instance.Parent:FindFirstChild("Humanoid") or RayInfo.Instance.Parent.Parent:FindFirstChild("Humanoid")
+	if not hum then return end
+	
+	--We trigger an event to initiate camera shake.
+	FistsService.Client.Shake:Fire(Player)
+
+	--We clone our fireball. Then, we create the first attachment and set its parent to our fireball. Subsequently, we create the second attachment, and its parent will be the object hit by the raycast.
+	local Fireball_Clone = Fireball:Clone()
+	Fireball_Clone.Parent = workspace
+	Fireball_Clone.Sphereyellow.CFrame = Player.Character.HumanoidRootPart.CFrame * CFrame.new(Vector3.new(0,0,-2))
+
+	local Attachment1 = Instance.new("Attachment", Fireball_Clone.Sphereyellow)
+	local Attachemnt2 = Instance.new("Attachment", RayInfo.Instance)
+
+	--We create an align position so that our object smoothly flies towards the target. This is why we created attachments, because align position only accepts attachments.
+	local AlignPos = Instance.new("AlignPosition", Fireball_Clone.Sphereyellow)
+	AlignPos.Attachment0 = Attachment1
+	AlignPos.Attachment1 = Attachemnt2
+	
+	--We use the functions we created earlier to play a sound and trigger an animation.
+	FistsService:PlayAnim(Player, 17415784526)
+	FistsService:PlaySound(Player.Character, 1544022435)
+	
+	--
+	-- every heartbeat, we check the position of our ball relative to the target. As soon as the ball reaches its destination,
+	-- we disconnect an event, remove our ball, and deal damage to our enemy.
+	--
+	
+	local hearbeat
+	hearbeat = RunService.Heartbeat:Connect(function()
+		if (Fireball_Clone.Sphereyellow.Position - RayInfo.Instance.Position).Magnitude < 5 then
+			hearbeat:Disconnect()
+			Fireball_Clone:Destroy()	
+			Attachemnt2:Destroy()
+			hum:TakeDamage(math.random(10,25))
+		end
+	end)
+	
+	PlayersState[Player].InState = false
+end
+
 function FistsService.Client:Block(Player)
     --
-    --We check our player for cooldown and whether they are in the table of player states. 
-    --If yes, we set the value in this table indicating that the player is in a blocked state, or vice versa.
+    -- We check our player for cooldown and whether they are in the table of player states. 
+    -- If yes, we set the value in this table indicating that the player is in a blocked state, or vice versa.
     --
 	if not blockCooldown:CheckPlayer(Player.UserId) then return end -- checking ready player or not
 	
@@ -209,7 +277,7 @@ function FistsService:CreateBloodPart(Character, Size_Set)
 			local BloodPart =  ParticlesFolder.BloodPart:Clone()
 			BloodPart.Parent = workspace
 			BloodPart.Position = rayInfo.Position
-
+			
 			TweenService:Create(BloodPart, TweenInfo.new(2.5, Enum.EasingStyle.Exponential), {Size = Size_Set or Vector3.new(math.random(4,6),0.05,math.random(4,6))}):Play()
 
 			Debris:AddItem(BloodPart, 9) 
@@ -258,7 +326,8 @@ end
 function FistsService.PlayerJoin(Player : Player)
 	PlayersState[Player] = { -- add player in table
 		InBlock = false,
-		CanDamage = true
+		CanDamage = true,
+		InState = false
 	}	
 	
 	Player.CharacterAdded:Connect(function(Character)
