@@ -106,10 +106,10 @@ function FistsService.Client:Attack(Player, AttackType)
 end
 
 function FistsService.Client:Block(Player)
-    --[[
+    --
     --We check our player for cooldown and whether they are in the table of player states. 
     --If yes, we set the value in this table indicating that the player is in a blocked state, or vice versa.
-    --]]
+    --
 	if not blockCooldown:CheckPlayer(Player.UserId) then return end -- checking ready player or not
 	
 	local PlayerInTable = PlayersState[Player] -- finding player into the table with state
@@ -125,10 +125,10 @@ function FistsService.Client:Block(Player)
 		PlayerInTable.InBlock = false
 	end
 	
-	--[[
-	We create a coroutine so that we can later suspend the function to avoid a bug where the block
-	is removed and placed again, preventing it from being removed again
-	--]]
+	--
+	--We create a coroutine so that we can later suspend the function to avoid a bug where the block
+	--is removed and placed again, preventing it from being removed again
+	--
 	
 	if PlayerInTable.InBlock then
 		PlayerInTable.BlockAnim = FistsService:PlayAnim(Player,Settings.BlockAnim)
@@ -150,11 +150,11 @@ function FistsService:MakeColliderAndFind(Character)
 	local ColliderCFrame = Character.HumanoidRootPart.CFrame * CFrame.new(Vector3.new(0,0,-2))
 	local ColliderSize = Settings.ColliderSize
 	
-	--[[
+	--
 	--We create parameters for our collider and set an option to make our player not visible to the collider. 
 	--If the collider detects any player, we stop the loop and return the character of that player.
 	--Also, if debug mode is enabled, we create a debug object with parameters from our variables.
-	--]]
+	--
 	
 	local Overlap = OverlapParams.new() -- Creating Overlap
 	Overlap.FilterType = Enum.RaycastFilterType.Exclude -- Settings type on exclude
@@ -223,10 +223,10 @@ end
 -- Create blood particles on hit player
 
 function FistsService:CreateBlood(Character, LookVector)
-	--[[
+	--
 	--We clone the blood particle and attach it to the character we are hitting. 
 	--Then we add a weld and the particle to the debris to be removed after the specified time.
-	--]]
+	--
 	local Blood = ParticlesFolder.Blood:Clone()
 	Blood.Parent = workspace
 	Blood.Position = Character.HumanoidRootPart.Position - LookVector*1 -- we set the position so that it is closer to the side of the player who hit
